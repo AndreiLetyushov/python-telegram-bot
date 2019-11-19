@@ -48,6 +48,41 @@ class DelayQueueError(RuntimeError):
     pass
 
 
+class PriorityItem(object):
+    """
+    Helper class for comparison by priority in ``PriorityQueue``. This class need because
+    ``PriorityQueue`` can not compare promises at sorting queue and raises ``TypeError`
+
+    Attributes:
+        priority (:obj:`int`): Priority of the task
+
+    Args:
+        item (:obj:`tuple`):
+
+    """
+
+    item = None
+    priority = None
+
+    def __init__(self, item, priority=0):
+        self.item = item
+        self.priority = priority
+
+    def __eq__(self, other):
+        return self.priority == other.priority
+
+    def __lt__(self, other):
+        return self.priority < other.priority
+
+    def __cmp__(self, other):
+        if self.priority < other.priority:
+            return False
+        if self.priority > other.priority:
+            return True
+        if self.priority == other.priority:
+            return 0
+
+
 class DelayQueue(threading.Thread):
     """
     Processes callbacks from queue with specified throughput limits. Creates a separate thread to
@@ -88,7 +123,7 @@ class DelayQueue(threading.Thread):
                  exc_route=None,
                  autostart=True,
                  name=None):
-        self._queue = queue if queue is not None else q.Queue()
+        self._queue = queue if queue is not None else q.PriorityQueue()
         self.burst_limit = burst_limit
         self.time_limit = time_limit_ms / 1000
         self.exc_route = (exc_route if exc_route is not None else self._default_exception_handler)
@@ -128,7 +163,7 @@ class DelayQueue(threading.Thread):
                 time.sleep(times[1] - t_delta)
             # finally process one
             try:
-                func, args, kwargs = item
+                func, args, kwargs = item.item
                 func(*args, **kwargs)
             except Exception as exc:  # re-route any exceptions
                 self.exc_route(exc)  # to prevent thread exit
@@ -158,7 +193,7 @@ class DelayQueue(threading.Thread):
 
         raise exc
 
-    def __call__(self, func, *args, **kwargs):
+    def __call__(self, func, priority=0, *args, **kwargs):
         """Used to process callbacks in throughput-limiting thread through queue.
 
         Args:
@@ -171,7 +206,8 @@ class DelayQueue(threading.Thread):
 
         if not self.is_alive() or self.__exit_req:
             raise DelayQueueError('Could not process callback in stopped thread')
-        self._queue.put((func, args, kwargs))
+        item = PriorityItem(item=(func, args, kwargs), priority=priority)
+        self._queue.put(item)
 
 
 # The most straightforward way to implement this is to use 2 sequenital delay
@@ -236,7 +272,7 @@ class MessageQueue(object):
 
     stop.__doc__ = DelayQueue.stop.__doc__ or ''  # reuse docsting if any
 
-    def __call__(self, promise, is_group_msg=False):
+    def __call__(self, promise, priority, is_group_msg=False):
         """
         Processes callables in troughput-limiting queues to avoid hitting limits (specified with
         :attr:`burst_limit` and :attr:`time_limit`.
@@ -262,9 +298,9 @@ class MessageQueue(object):
         """
 
         if not is_group_msg:  # ignore middle group delay
-            self._all_delayq(promise)
+            self._all_delayq(promise, priority)
         else:  # use middle group delay
-            self._group_delayq(self._all_delayq, promise)
+            self._group_delayq(self._all_delayq, promise, priority)
         return promise
 
 
@@ -304,9 +340,10 @@ def queuedmessage(method):
     def wrapped(self, *args, **kwargs):
         queued = kwargs.pop('queued', self._is_messages_queued_default)
         isgroup = kwargs.pop('isgroup', False)
+        priority = kwargs.pop('priority', 0)
         if queued:
             prom = promise.Promise(method, (self, ) + args, kwargs)
-            return self._msg_queue(prom, isgroup)
+            return self._msg_queue(promise=prom, priority=priority, is_group_msg=isgroup)
         return method(self, *args, **kwargs)
 
     return wrapped
