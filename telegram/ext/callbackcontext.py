@@ -116,6 +116,7 @@ class CallbackContext(object):
         if user_data is None:
             user_data = defaultdict(dict)
         user_data[key] = value
+        self._dispatcher.cache.set(self._user_id, user_data)
 
     @classmethod
     def from_error(cls, update, error, dispatcher):
