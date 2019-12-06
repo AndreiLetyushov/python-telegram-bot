@@ -19,6 +19,7 @@
 """This module contains the CallbackContext class."""
 
 from telegram import Update
+from collections import defaultdict
 
 
 class CallbackContext(object):
@@ -75,6 +76,8 @@ class CallbackContext(object):
         self._dispatcher = dispatcher
         self._chat_data = None
         self._user_data = None
+        self._chat_id = None
+        self._user_id = None
         self.args = None
         self.matches = None
         self.error = None
@@ -97,6 +100,22 @@ class CallbackContext(object):
     def user_data(self, value):
         raise AttributeError("You can not assign a new value to user_data, see "
                              "https://git.io/fjxKe")
+
+    def cache_user_data(self, key):
+        if self._dispatcher.cache is None:
+            raise Exception("Cache is not initialize in Dispatcher, use 'user_data' property instead")
+        user_data = self._dispatcher.cache.get(self._user_id)
+        if user_data is None:
+            return None
+        return user_data[key]
+
+    def set_cache_user_data(self, key, value):
+        if self._dispatcher.cache is None:
+            raise Exception("Cache is not initialize in Dispatcher, use 'user_data' property instead")
+        user_data = self._dispatcher.cache.get(self._user_id)
+        if user_data is None:
+            user_data = defaultdict(dict)
+        user_data[key] = value
 
     @classmethod
     def from_error(cls, update, error, dispatcher):
