@@ -129,12 +129,16 @@ class CallbackContext(object):
         self = cls(dispatcher)
         if update is not None and isinstance(update, Update):
             chat = update.effective_chat
+            self._chat_id = chat.id
             user = update.effective_user
+            self._user_id = user.id
 
             if chat:
                 self._chat_data = dispatcher.chat_data[chat.id]
-            if user:
-                self._user_data = dispatcher.user_data[user.id]
+
+            if self._dispatcher.cache is None:
+                if user:
+                    self._user_data = dispatcher.user_data[user.id]
         return self
 
     @classmethod
