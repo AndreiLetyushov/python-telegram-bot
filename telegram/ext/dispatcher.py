@@ -109,14 +109,12 @@ class Dispatcher(object):
                  exception_event=None,
                  job_queue=None,
                  persistence=None,
-                 cache=None,
                  use_context=False):
         self.bot = bot
         self.update_queue = update_queue
         self.job_queue = job_queue
         self.workers = workers
         self.use_context = use_context
-        self.cache = cache
 
         if not use_context:
             warnings.warn('Old Handler API is deprecated - see https://git.io/fxJuV for details',
