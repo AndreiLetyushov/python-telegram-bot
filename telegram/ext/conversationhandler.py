@@ -392,7 +392,8 @@ class ConversationHandler(Handler):
         elif isinstance(new_state, Promise):
             with self._conversations_lock:
                 if self.cache:
-                    self.cache.set(f'{self.name}-{key[0]}-{key[1]}', (self.conversations.get(key), new_state))
+                    old_state = self.cache.get(f'{self.name}-{key[0]}-{key[1]}')
+                    self.cache.set(f'{self.name}-{key[0]}-{key[1]}', (old_state, new_state))
                 else:
                     self.conversations[key] = (self.conversations.get(key), new_state)
                 if self.persistent:
