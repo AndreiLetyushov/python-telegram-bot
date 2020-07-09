@@ -163,6 +163,7 @@ class ConversationHandler(Handler):
                  conversation_timeout=None,
                  name=None,
                  persistent=False,
+                 cache=False,
                  map_to_parent=None):
 
         self.entry_points = entry_points
@@ -178,6 +179,9 @@ class ConversationHandler(Handler):
         if persistent and not self.name:
             raise ValueError("Conversations can't be persistent when handler is unnamed.")
         self.persistent = persistent
+        if cache and not self.name:
+            raise ValueError("Conversations can't be cached when handler is unnamed.")
+        self.cache = cache
         self.persistence = None
         """:obj:`telegram.ext.BasePersistance`: The persistence used to store conversations.
         Set by dispatcher"""
@@ -265,7 +269,10 @@ class ConversationHandler(Handler):
 
         key = self._get_key(update)
         with self._conversations_lock:
-            state = self.conversations.get(key)
+            if self.cache:
+                state = self.cache.get(f"{self.name}-{key}")
+            else:
+                state = self.conversations.get(key)
 
         # Resolve promises
         if isinstance(state, tuple) and len(state) == 2 and isinstance(state[1], Promise):
@@ -285,7 +292,10 @@ class ConversationHandler(Handler):
                         res = self.END
                     self.update_state(res, key)
                     with self._conversations_lock:
-                        state = self.conversations.get(key)
+                        if self.cache:
+                            state = self.cache.get(f"{self.name}-{key}")
+                        else:
+                            state = self.conversations.get(key)
             else:
                 handlers = self.states.get(self.WAITING, [])
                 for handler in handlers:
@@ -372,20 +382,29 @@ class ConversationHandler(Handler):
             with self._conversations_lock:
                 if key in self.conversations:
                     # If there is no key in conversations, nothing is done.
-                    del self.conversations[key]
+                    if self.cache:
+                        self.cache.set(f'{self.name}-{key}', None)
+                    else:
+                        del self.conversations[key]
                     if self.persistent:
                         self.persistence.update_conversation(self.name, key, None)
 
         elif isinstance(new_state, Promise):
             with self._conversations_lock:
-                self.conversations[key] = (self.conversations.get(key), new_state)
+                if self.cache:
+                    self.cache.set(f'{self.name}-{key}', (self.conversations.get(key), new_state))
+                else:
+                    self.conversations[key] = (self.conversations.get(key), new_state)
                 if self.persistent:
                     self.persistence.update_conversation(self.name, key,
                                                          (self.conversations.get(key), new_state))
 
         elif new_state is not None:
             with self._conversations_lock:
-                self.conversations[key] = new_state
+                if self.cache:
+                    self.cache.set(f'{self.name}-{key}', new_state)
+                else:
+                    self.conversations[key] = new_state
                 if self.persistent:
                     self.persistence.update_conversation(self.name, key, new_state)
 
