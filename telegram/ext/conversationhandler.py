@@ -176,6 +176,8 @@ class ConversationHandler(Handler):
         self.per_message = per_message
         self.conversation_timeout = conversation_timeout
         self.name = name
+        self.promises = dict()
+
         if persistent and not self.name:
             raise ValueError("Conversations can't be persistent when handler is unnamed.")
         self.persistent = persistent
@@ -270,7 +272,14 @@ class ConversationHandler(Handler):
         key = self._get_key(update)
         with self._conversations_lock:
             if self.cache:
-                state = self.cache.get(f"{self.name}-{key[0]}-{key[1]}")
+                try:
+                    state = self.cache.get(f"{self.name}-{key[0]}-{key[1]}")
+                except Exception:
+                    state = None
+
+                if key in self.promises:
+                    state = (state, self.promises.get(key))
+                    del self.promises[key]
             else:
                 state = self.conversations.get(key)
 
@@ -392,8 +401,7 @@ class ConversationHandler(Handler):
         elif isinstance(new_state, Promise):
             with self._conversations_lock:
                 if self.cache:
-                    old_state = self.cache.get(f'{self.name}-{key[0]}-{key[1]}')
-                    self.cache.set(f'{self.name}-{key[0]}-{key[1]}', (old_state, new_state))
+                    self.promises[key] = new_state
                 else:
                     self.conversations[key] = (self.conversations.get(key), new_state)
                 if self.persistent:
