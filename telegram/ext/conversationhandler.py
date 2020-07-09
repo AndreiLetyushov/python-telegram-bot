@@ -270,7 +270,7 @@ class ConversationHandler(Handler):
         key = self._get_key(update)
         with self._conversations_lock:
             if self.cache:
-                state = self.cache.get(f"{self.name}-{key}")
+                state = self.cache.get(f"{self.name}-{key[0]}-{key[1]}")
             else:
                 state = self.conversations.get(key)
 
@@ -293,7 +293,7 @@ class ConversationHandler(Handler):
                     self.update_state(res, key)
                     with self._conversations_lock:
                         if self.cache:
-                            state = self.cache.get(f"{self.name}-{key}")
+                            state = self.cache.get(f"{self.name}-{key[0]}-{key[1]}")
                         else:
                             state = self.conversations.get(key)
             else:
@@ -383,7 +383,7 @@ class ConversationHandler(Handler):
                 if key in self.conversations:
                     # If there is no key in conversations, nothing is done.
                     if self.cache:
-                        self.cache.set(f'{self.name}-{key}', None)
+                        self.cache.set(f'{self.name}-{key[0]}-{key[1]}', None)
                     else:
                         del self.conversations[key]
                     if self.persistent:
@@ -392,7 +392,7 @@ class ConversationHandler(Handler):
         elif isinstance(new_state, Promise):
             with self._conversations_lock:
                 if self.cache:
-                    self.cache.set(f'{self.name}-{key}', (self.conversations.get(key), new_state))
+                    self.cache.set(f'{self.name}-{key[0]}-{key[1]}', (self.conversations.get(key), new_state))
                 else:
                     self.conversations[key] = (self.conversations.get(key), new_state)
                 if self.persistent:
@@ -402,7 +402,7 @@ class ConversationHandler(Handler):
         elif new_state is not None:
             with self._conversations_lock:
                 if self.cache:
-                    self.cache.set(f'{self.name}-{key}', new_state)
+                    self.cache.set(f'{self.name}-{key[0]}-{key[1]}', new_state)
                 else:
                     self.conversations[key] = new_state
                 if self.persistent:
